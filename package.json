@@ -1,0 +1,29 @@
+{
+  "name": "cartapacio-core",
+  "version": "0.0.1",
+  "description": "generate a static site",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cartapacio/cartapacio.core.git"
+  },
+  "keywords": [
+    "generator"
+  ],
+  "author": "Gabriel Zea <zea@gbrl.in> (http://gbrl.in/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cartapacio/cartapacio.core/issues"
+  },
+  "homepage": "https://github.com/cartapacio/cartapacio.core",
+  "dependencies": {
+    "handlebars": "^2.0.0-alpha.2",
+    "handlebars-helpers": "^0.5.5"
+  },
+  "devDependencies": {
+    "grunt": "^0.4.5"
+  }
+}
