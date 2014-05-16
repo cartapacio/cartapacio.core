@@ -6,6 +6,7 @@ var async = require('async'),
   Template = require('./src/template'),
   Loader = require('./src/load'),
   Writer = require('./src/write')
+  // Data = require('./src/data')
 
 /*
   params:
@@ -21,6 +22,8 @@ function Cartapacio (tplPath, output, callback) {
     output: output
   }
 
+  // this.database = new Data('./tmp/cartapacio_db')
+
   this.callback = callback
 
   this.init()
@@ -33,6 +36,11 @@ Cartapacio.prototype.init = function() {
   this.layouts = new Loader(this.paths.layouts)
 
   this.writer = new Writer(this.paths.output)
+
+  // var self = this
+  // this.database.find('project', function (err, data){
+  //   self.docs = data
+  // })
 
   this.loadNcompile()
 };
@@ -90,31 +98,44 @@ Cartapacio.prototype.loadNcompile = function() {
 Cartapacio.prototype.write = function(input, callback) {
   var self = this
 
-  async.waterfall([
-    function (next){
-      self.templates.render(self.template, input, function (err, data){
-        if (err) {
-          return next('Rendering: ' + err, null)
-        }
-        next(null, data)
-      })
-    },
-    function (data, next){
-      self.writer.create(input.site.filename, data, function(err){
-        if (err) {
-          next(err, null)
-        }
-        next(null, 'File: ' + input.site.filename + ' written')
-      })
-      }
-    ],
-    function (err, result){
-      if (err){
-        callback(err, null)
-      }
-      callback(null, result)
+
+  _.each(input.documents, function (document){
+    var doc = {
+      sidebar: input.site.sidebar,
+      document: document
     }
-  )
+
+    async.waterfall([
+      function (next){
+        self.templates.render(self.template, doc, function (err, data){
+          if (err) {
+            return next('Rendering: ' + err, null)
+          }
+          next(null, data)
+        })
+      },
+      function (data, next){
+        self.writer.create(document.filename+'.html', data, function(err){
+          if (err) {
+            next(err, null)
+          }
+          next(null, 'File: ' + document.filename + ' written')
+        })
+        }
+      ],
+      function (err, result){
+        if (err){
+          callback(err, null)
+        }
+        //callback(null, result)
+        console.log(result)
+      }
+    )
+
+    //console.log(JSON.stringify(doc, null, 2))
+  })
+
+
 };
 
 
