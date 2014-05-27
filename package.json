@@ -1,6 +1,6 @@
 {
   "name": "cartapacio-core",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "generate a static site",
   "main": "index.js",
   "scripts": {

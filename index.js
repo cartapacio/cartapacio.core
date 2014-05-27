@@ -3,140 +3,146 @@
 var async = require('async'),
   path = require('path'),
   _ = require('lodash'),
-  Template = require('./src/template'),
-  Loader = require('./src/load'),
-  Writer = require('./src/write')
-  // Data = require('./src/data')
+  Template = require('cartapacio.core.template'),
+  Writer = require('cartapacio.core.writer'),
+  Amass = require('cartapacio.core.amass')
 
-/*
-  params:
-    tplPath: rootFile for templates
-    output: output dir
-*/
+// /*
+//   params:
+//     tplPath: rootFile for templates
+//     output: output dir
+// */
 
-function Cartapacio (tplPath, output, callback) {
-  this.paths = {
-    templatesRoot: tplPath,
-    partials: path.join(tplPath, 'src', 'templates', 'partials'),
-    layouts:  path.join(tplPath, 'src', 'templates', 'layouts'),
-    output: output
-  }
+function Cartapacio (database, tplPath, output, toBuild) {
 
-  // this.database = new Data('./tmp/cartapacio_db')
+  this.templatesRoot = tplPath
+  this.outputFolder = output
+  this.dbPath = database
+  this.toBuild = toBuild
 
-  this.callback = callback
-
-  this.init()
 }
 
-Cartapacio.prototype.init = function() {
-  this.templates = new Template()
+Cartapacio.prototype.init = function(callbackInit) {
+  this.database = new Amass(this.dbPath)
+  this.templates = new Template(this.templatesRoot)
+  this.writer = new Writer(this.outputFolder)
 
-  this.partials = new Loader(this.paths.partials)
-  this.layouts = new Loader(this.paths.layouts)
-
-  this.writer = new Writer(this.paths.output)
-
-  // var self = this
-  // this.database.find('project', function (err, data){
-  //   self.docs = data
-  // })
-
-  this.loadNcompile()
-};
-
-Cartapacio.prototype.loadNcompile = function() {
-  var self = this
-
-  async.waterfall(
-    [
-      function (next){
-        self.partials.read(function (err, data){
-          if (err) {
-            return next('Reading partials:' + err, null)
-          }
-
-          _.each(data, function (file){
-            self.templates.registerPartial(file.name, file.content)
-          })
-
-          next(null)
-        })
-      },
-
-      function (next){
-        self.layouts.read(function (err, data){
-          if (err) {
-            return next('Reading layouts: ' + err, null)
-          }
-
-          next(null, data)
-        })
-      },
-
-      function (files, next){
-        self.templates.compile(files[0].content, function (err, tpl){
-          if (err){
-            return next('Compiling template: ' + err, null)
-          }
-
-          next(null, tpl)
-        })
-      }
-    ],
-    function (err, tpl){
-      if (err){
-        self.callback(err)
-      }
-
-      self.template = tpl
-      self.callback(null)
+  this.templates.load(function (err){
+    if(err){
+      throw new Error(err)
+      callbackInit(err)
     }
-  )
-}
-
-Cartapacio.prototype.write = function(input, callback) {
-  var self = this
-
-
-  _.each(input.documents, function (document){
-    var doc = {
-      sidebar: input.site.sidebar,
-      document: document
-    }
-
-    async.waterfall([
-      function (next){
-        self.templates.render(self.template, doc, function (err, data){
-          if (err) {
-            return next('Rendering: ' + err, null)
-          }
-          next(null, data)
-        })
-      },
-      function (data, next){
-        self.writer.create(document.filename+'.html', data, function(err){
-          if (err) {
-            next(err, null)
-          }
-          next(null, 'File: ' + document.filename + ' written')
-        })
-        }
-      ],
-      function (err, result){
-        if (err){
-          callback(err, null)
-        }
-        //callback(null, result)
-        console.log(result)
-      }
-    )
-
-    //console.log(JSON.stringify(doc, null, 2))
+    callbackInit(null)
   })
 
-
 };
 
+Cartapacio.prototype.buildWebsite = function() {
+  var self = this
+
+  async.waterfall([
+    function (next){
+      self.init(function (err){
+        if(!err){
+          next(null)
+        }
+      })
+    },
+    function (next){
+      async.eachSeries(self.toBuild, function (item, itemDone){
+        console.info('building ', item)
+
+        async.waterfall([
+            function (_next){
+              self.getData(item.detail, function (docs){
+                console.info('get data ', item.detail)
+                _next(null, docs)
+              })
+            },
+            function (docs, _next){
+              if(item.list){
+                var itemList = self.makeList(docs, 'default', item.list)
+                self.render(itemList, function (err){
+                  _next(null, docs)
+                })
+              }
+            },
+            function (docs, _next){
+              console.info('render ', item.detail);
+              self.render(docs, function (err){
+                _next(err)
+              })
+            }
+          ],
+          function (err){
+            if(err){
+              console.error(err);
+            }
+            console.info('done ', item.detail);
+            itemDone(null)
+          }
+        )
+      }, function (err){
+        if(err){
+          throw new Error('building array: ', err)
+        }
+        console.info('build tasks done');
+        next(null)
+      })
+
+    }
+    ],
+    function (err){
+      if(err){
+        throw new Error('build website: ', err)
+      }
+      console.log('all done');
+    }
+  )
+};
+
+Cartapacio.prototype.getData = function(doctype, callback) {
+  this.database.documents(doctype, function (err, docs){
+    if(err){
+      throw new Error(err)
+    }
+    callback(docs)
+  })
+};
+
+Cartapacio.prototype.render = function(docs, renderDone) {
+  var self = this
+  async.each(docs, function (doc, nextDoc){
+    self.templates.render(doc, function (err, html){
+      var _path = self.makePath(doc)
+      self.writer.write(_path, html, function (err){
+        nextDoc(err)
+      })
+    })
+  }, function (err){
+    if(err){
+      console.error(err)
+    }
+    renderDone(null)
+  })
+};
+
+Cartapacio.prototype.makeList = function(docs, layout, page) {
+  var doc = [{
+    layout: layout,
+    page: page,
+    document: docs
+  }]
+
+  return doc
+};
+
+Cartapacio.prototype.makePath = function(doc) {
+  if(doc.slug){
+    return doc.page+'/'+doc.slug+'/index.html'
+  } else {
+    return doc.page+'/index.html'
+  }
+};
 
 module.exports = Cartapacio
