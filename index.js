@@ -1,6 +1,7 @@
 'use strict';
 
 var async = require('async'),
+  fs = require('fs-extra'),
   path = require('path'),
   _ = require('lodash'),
   Template = require('cartapacio.core.template'),
@@ -13,10 +14,11 @@ var async = require('async'),
 //     output: output dir
 // */
 
-function Cartapacio (database, tplPath, output, toBuild) {
+function Cartapacio (database, tplPath, output, webpageFolder, toBuild) {
 
   this.templatesRoot = tplPath
   this.outputFolder = output
+  this.webpageFolder = webpageFolder
   this.dbPath = database
   this.toBuild = toBuild
 
@@ -41,11 +43,37 @@ Cartapacio.prototype.buildWebsite = function() {
   var self = this
 
   async.waterfall([
+    // initialize everything
     function (next){
+      console.info('initializing');
       self.init(function (err){
         if(!err){
           next(null)
         }
+      })
+    },
+    // copy static files
+    function (next){
+      console.info('copying static files')
+      var input = path.join(self.webpageFolder, 'static')
+      var output = path.join(self.outputFolder, 'static')
+      fs.copy(input, output, function (err){
+        if (err){
+          next(err)
+        }
+        next(null)
+      })
+    },
+    // copy assets
+    function (next){
+      console.info('copying assets files')
+      var input = path.join(self.templatesRoot, 'src', 'assets')
+      var output = path.join(self.outputFolder, 'assets')
+      fs.copy(input, output, function (err){
+        if (err){
+          next(err)
+        }
+        next(null)
       })
     },
     function (next){
@@ -65,6 +93,8 @@ Cartapacio.prototype.buildWebsite = function() {
                 self.render(itemList, function (err){
                   _next(null, docs)
                 })
+              } else {
+                _next(null, docs)
               }
             },
             function (docs, _next){
