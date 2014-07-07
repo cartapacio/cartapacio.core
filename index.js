@@ -14,12 +14,12 @@ var async = require('async'),
 //     output: output dir
 // */
 
-function Cartapacio (database, tplPath, output, webpageFolder, toBuild) {
+function Cartapacio (webpageFolder, tplPath, output,  toBuild) {
 
   this.templatesRoot = tplPath
   this.outputFolder = output
   this.webpageFolder = webpageFolder
-  this.dbPath = database
+  this.dbPath = path.join(webpageFolder, 'cartapacio_db')
   this.toBuild = toBuild
 
 }
